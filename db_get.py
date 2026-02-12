@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1 import ImageGrid
 import base64
+#import cv2
 
 #https://weaviate-python-client.readthedocs.io/en/v3.2.3/weaviate.data.html
 
@@ -68,25 +69,20 @@ for imgn in imgs.keys():
             ibin = base64.b64decode(im[0])
             print(type(ibin))
             print(im[1])
-            nar = np.frombuffer(ibin,dtype='<u4')
+            # this isn't a uint8 anymore.
+            #nar = np.frombuffer(ibin,dtype=np.uint8)
+            nar = np.frombuffer(ibin,dtype='f4')
             #nar = np.array(list(ibin),dtype=int)
+            print(nar.dtype)
             nar = nar.reshape( im[1] )
+            print(nar.dtype)
             nar = nar[:,:,::-1]
-            as_pil = Image.frombuffer( 'RGB', im[1][:2], nar.flatten()  ) # BytesIO(ibin))
 
-            ax.imshow( as_pil ) #np.array(ibin))
+            ax.imshow( nar ) #np.array(ibin))
 
     plt.show()
-    sys.exit(1)
+    #if cv2.waitKey(1) & 0xFF == ord('q'):
+    #    break
 
 
 
-for itm in wc.data_object.get()['objects']:
-    #print(itm.uuid, itm.properties)
-    if first:
-        first=False
-        print( "Props: {}".format( ",".join( itm['properties'].keys())))
-    props = itm['properties']
-    # props face?
-    #print(f"* {itm['class']} {props['img_name']} {props['face_shape']} {itm['id']}")
-    #"objects" ?
