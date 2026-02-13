@@ -4,6 +4,8 @@ import math
 import base64
 from mpl_toolkits.axes_grid1 import ImageGrid
 import weaviate
+from PIL import Image
+from typing import List,Tuple
 
 def mpl_grid( df_images):
     nf = len(df_images)
@@ -33,26 +35,28 @@ def mpl_grid( df_images):
         ax.imshow( nar )
     plt.show()
 
-def convert_deepface_images( df_images: List[str] ) -> List[np.array]:
-    def convert( df_str ):
+def convert_deepface_images( df_images: List[str] ) -> List[Tuple[np.array,List[int]]]:
+    def convert( df_str, face_shape ):
         # data from deepface is:
 
         # base64 encoded
-        ibin = base64.b64decode(im[0])
+        ibin = base64.b64decode(df_str)
         # float32
         nar = np.frombuffer(ibin,dtype='f4')
         # and BGR
-        nar = nar.reshape( im[1] )
+        nar = nar.reshape( face_shape )
         # convert back to 1d
-        return  nar[:,:,::-1]
-    return map( convert, df_images )
+        return  (nar[:,:,::-1],face_shape)
+    def split( pair ):
+        return convert(pair[0],pair[1])
+    return map( split, df_images )
 
 wc = weaviate.Client( url="http://localhost:8080")
 df_class= "Embeddings_vggface_retinaface_aligned_raw"
 
 # returns faces as pngs
 def db_get_faces(image_name:str):
-    img_find = wc.query.get(df_class, properties=["embedding", "face", "face_shape"]).with_additional(["id"])\
+    img_find = wc.query.get(df_class, properties=["embedding","embedding_hash", "face", "face_shape"]).with_additional(["id"])\
             .with_where( {
                     "path": ["img_name"],
                     "operator":"Equal",
@@ -74,12 +78,14 @@ def db_get_faces(image_name:str):
     print(f"Image had {rcnt} {noun}") 
 
     # takes raw np
-    def convert_to_pngs( nparr, size ):
-        return Image.fromarray( nparr.astype(np.uint8)a)
+    def convert_to_pngs( pair ):
+        nparr, size  = pair
+        # we need uint8, not float32
+        return Image.fromarray( (nparr * 255).astype(np.uint8))
 
-    return map( convert_to_pngs, zip(
-        convert_deepface_images( [ f["embedding"]  for f in results ]),
-        f["face_shape"] for f in results )
-        )
+    return zip(map( convert_to_pngs, 
+        convert_deepface_images( [ (f["face"], f["face_shape"])   for f in
+            results ])),
+        [(f["embedding_hash"],f["embedding"]) for f in results])
 
 

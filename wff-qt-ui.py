@@ -29,10 +29,31 @@ class WFFImageGridLabel(QLabel):
     def mousePressEvent(self,event):
         self.gridImageClicked.emit(self.row,self.col,str(self.file))
 
-class WFFFaceGroupWindow(QWidget):
-    pass
+class WFFFaceLabel(QLabel):
+    faceImageClicked = pyqtSignal(str)
+    def __init__(self,face_num, embedding_hash):
+        QLabel.__init__(self,"face item")
+        self.setToolTip(f"Face {face_num} hash: {embedding_hash}") 
+        self.hash = embedding_hash
+    def mousePressEvent(self,event):
+        self.faceImageClicked.emit(self.hash)
 
+
+class WFFFaceMatchesWindow(QWidget):
+    imageSelected  = pyqtSignal(str)
+    def __init__(self, embedding_hash:str): 
+        QWidget.__init__(self)
+        print(f"Face Matches: {embedding_hash}")
+        # face in top
+        # matches in bottom
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("main item"))
+        layout.addWidget(QLabel("matches")) 
+        self.setLayout(layout)
+
+        #db_get_face_matches(embedding_hash)
 class WFFPictureMatchesWindow(QWidget):
+    faceSelected  = pyqtSignal(str)
     def __init__(self, image:str): 
         QWidget.__init__(self)
         layout = QGridLayout()
@@ -45,13 +66,23 @@ class WFFPictureMatchesWindow(QWidget):
         # returns array of PIL.Image
         faces = db_get_faces(Path(image).name)
         vbox = QVBoxLayout()
+        for fn,face_data in enumerate(faces):
+            #print(f"Adding {face} {fn}")
+            face,info = face_data
+            face_label = WFFFaceLabel(fn, info[0])
+            as_qimg = QPixmap.fromImage(ImageQt.ImageQt(face).copy())
+            face_label.setPixmap(as_qimg)
+            face_label.faceImageClicked.connect(self.facePicked )
+            vbox.addWidget(face_label)
 
-        vbox.addWidget(QLabel("test1"))
-        vbox.addWidget(QLabel("test2"))
-        vbox.addWidget(QLabel("test3"))
         layout.addWidget(label,0,0,3,2)
         layout.addItem(vbox,0,2,3,1)
         self.setLayout(layout)
+
+    @pyqtSlot(str)
+    def facePicked(self,face_hash): 
+        print(f"Picture Matches: face picked: {face_hash}")
+        self.faceSelected.emit(face_hash)
 
 class WFFPictureGridWindow(QWidget):
     imageSelected  = pyqtSignal(str)
@@ -94,17 +125,32 @@ class WFFWindow(QWidget):
         self.setLayout(layout)
 
         self.image_views = {}
+        self.face_views = {}
+
+        self.current_view = self.picture_grid
 
     @pyqtSlot(str)
     def viewImage(self,image_name):
-        print(f"main: Load {image_name}")
+        print(f"main: Load image {image_name}")
         if image_name not in self.image_views:
             self.image_views[image_name] = WFFPictureMatchesWindow(image_name)
-        self.picture_grid.hide()
-        self.layout().replaceWidget(self.picture_grid,self.image_views[image_name])
+            self.image_views[image_name].faceSelected.connect(self.viewFace)
+        self.current_view.hide()
+        self.layout().replaceWidget(self.current_view,self.image_views[image_name])
+        self.current_view = self.image_views[image_name]
+
+    @pyqtSlot(str)
+    def viewFace(self,face_hash):
+        print(f"main: Load face {face_hash}")
+        if face_hash not in self.face_views:
+            self.face_views[face_hash] = WFFFaceMatchesWindow(face_hash)
+            #self.image_views[image_name].faceSelected.connect(self.viewFace)
+        self.current_view.hide()
+        self.layout().replaceWidget(self.current_view,self.face_views[face_hash])
+        self.current_view = self.face_views[face_hash]
 
 
-class WFFImageGried(QWidget):
+class WFFImageGrid(QWidget):
     def __init__(self,images):
         QWidget.__init__()
 
