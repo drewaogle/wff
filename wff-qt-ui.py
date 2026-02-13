@@ -1,4 +1,5 @@
 import sys
+from PyQt6.QtCore import Qt,pyqtSignal,pyqtSlot
 from PyQt6.QtGui import *
 from PyQt6.QtWidgets import *
 from argparse import ArgumentParser
@@ -14,6 +15,18 @@ def get_args():
 @dataclass
 class WFFImage:
     path:Path
+
+class WFFImageGridLabel(QLabel):
+    gridImageClicked = pyqtSignal(int,int,str)
+    def __init__(self,text,row,col):
+        QLabel.__init__(self,text)
+        self.setToolTip(f"Source: {text}")
+        self.file = text
+        self.row = row
+        self.col = col
+    def mousePressEvent(self,event):
+        self.gridImageClicked.emit(self.row,self.col,self.file)
+
 
 class WFFWindow(QWidget):
     def __init__(self, images:List[WFFImage]):
@@ -31,10 +44,18 @@ class WFFWindow(QWidget):
                 img = images[c+r]
                 print(f"Row {row}, Column {c} : {img.path.name}")
                 px = QPixmap(str(img.path))
-                px_label = QLabel(img.path.name)
-                px_label.setPixmap(px)
+                spx=px.scaled(100,100,Qt.AspectRatioMode.KeepAspectRatio)
+                px_label = WFFImageGridLabel(img.path.name,row,c)
+                px_label.gridImageClicked.connect(self.imagePicked )
+                #self.imagePicked.connect(px_label.gridImageClicked)
+                px_label.setPixmap(spx)
+                #px_label.scaledContents = True
                 layout.addWidget(px_label,row,c)
         self.setLayout(layout)
+
+    @pyqtSlot(int,int,str)
+    def imagePicked(self,row,col,image_name):
+        print(f"{row} {col}: Load {image_name}")
 
 
 class WFFImageGried(QWidget):
