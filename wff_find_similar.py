@@ -1,8 +1,11 @@
 import sys
+import os
+os.environ["OPENCV_GUI_BACKEND"] = "None"
 from argparse import ArgumentParser
 from pathlib import Path
 import weaviate
 from wff_common import mpl_grid
+from deepface.modules.verification import find_threshold,find_confidence
 
 def get_args():
     parser = ArgumentParser()
@@ -60,9 +63,20 @@ if __name__ == "__main__":
 
     face_emb = results[args.face]["embedding"]
 
-    #similar = wc.query.get(df_class, properties=["face", "img_name"]).with_additional(["id"])\
-    similar = wc.query.get(df_class, properties=["img_name","face","face_shape"]).with_additional(["id", "distance"])\
-            .with_near_vector({"vector":face_emb}).do()
+    print(type(face_emb[0]))
+
+
+    # verification that we are feeding vector data in acceptably
+    sim_obj = True
+    if sim_obj:
+        print("Using Object Similiarity")
+        similar = wc.query.get(df_class, properties=["img_name","face","face_shape"]).with_additional(["id", "distance"])\
+                .with_near_object({"id":results[args.face]["_additional"]["id"]}).do()
+    else:
+        print("Using Vector Similiarity")
+        #similar = wc.query.get(df_class, properties=["face", "img_name"]).with_additional(["id"])\
+        similar = wc.query.get(df_class, properties=["img_name","face","face_shape"]).with_additional(["id", "distance"])\
+                .with_near_vector({"vector":face_emb}).do()
     if "errors" in similar:
         pprint(similar)
         sys.exit(1)
@@ -70,13 +84,35 @@ if __name__ == "__main__":
     scnt = len(sresults)
     print(f"Found {scnt}")
     i = 0
-    while i < 10:
+    df_model="VGG-Face"
+    df_vect_dist="cosine"
+    thresh = find_threshold(model_name=df_model, distance_metric=df_vect_dist)
+    filtered=[]
+    while i < 20:
+        addl = sresults[i]["_additional"]
+        passed_cutoff =  addl['distance'] <= thresh
+        conf = find_confidence(distance=addl['distance'], model_name=df_model,
+                distance_metric=df_vect_dist, verified=passed_cutoff)
+        print(f"{i} - {addl['id']} {addl['distance']} same? {passed_cutoff} {conf}%") 
+        filtered.append({ 
+            'face': sresults[i]["face"],
+            'shape': sresults[i]["face_shape"],
+            'verified':passed_cutoff,
+            'confidence':conf
+            })
         i = i + 1
         #pprint(sresults[i])
 
-    #mpl_grid([[results[args.face]["face"],results[args.face]["face_shape"]]] +
-    #        list([sr["face"],sr["face_shape"]] for sr in sresults[0:5]))
-    mpl_grid(list([sr["face"], sr["face_shape"]] for sr in sresults[0:6]))
+    final = list(filter(lambda x: x['confidence'] > 50.0, filtered))
+    final.sort(key=lambda x: x['confidence'])
+
+    if final is not None and len(final) > 0:
+        #mpl_grid([[results[args.face]["face"],results[args.face]["face_shape"]]] +
+        #        list([sr["face"],sr["face_shape"]] for sr in sresults[0:5]))
+        mpl_grid(list([sr["face"], sr["shape"]] for sr in final[0:6]))
+        #mpl_grid(list([sr["face"], sr["face_shape"]] for sr in sresults[0:6]))
+    else:
+        print("No matches")
         
 
 
