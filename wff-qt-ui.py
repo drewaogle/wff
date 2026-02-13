@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from dataclasses import dataclass
 from typing import List
-from wff_common import db_get_faces
+from wff_common import db_get_faces, db_get_similar_by_ehash
 from PIL import ImageQt
 
 def get_args():
@@ -38,6 +38,15 @@ class WFFFaceLabel(QLabel):
     def mousePressEvent(self,event):
         self.faceImageClicked.emit(self.hash)
 
+class WFFMatchLabel(QLabel):
+    matchImageClicked = pyqtSignal(str)
+    def __init__(self,embedding_hash, src_image, conf):
+        QLabel.__init__(self,"face item")
+        self.setToolTip(f"Face {embedding_hash}: src {src_image} confidence: {conf}%") 
+        self.hash = embedding_hash
+        self.src = src_image
+    def mousePressEvent(self,event):
+        self.matchImageClicked.emit(self.src)
 
 class WFFFaceMatchesWindow(QWidget):
     imageSelected  = pyqtSignal(str)
@@ -46,9 +55,25 @@ class WFFFaceMatchesWindow(QWidget):
         print(f"Face Matches: {embedding_hash}")
         # face in top
         # matches in bottom
+        faces = db_get_similar_by_ehash(embedding_hash)
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("main item"))
-        layout.addWidget(QLabel("matches")) 
+        if len(faces) > 0:
+            mface,mfi = faces[0]
+            mainface_label = WFFMatchLabel(mfi[0],mfi[2], mfi[1])
+            as_qimg = QPixmap.fromImage(ImageQt.ImageQt(mface).copy())
+            mainface_label.setPixmap(as_qimg)
+            hbox = QHBoxLayout()
+            if len(faces) > 1:
+                for f in faces[1:]:
+                    face,finfo = f 
+                    label = WFFMatchLabel(finfo[0],finfo[2], finfo[1])
+                    as_qimg = QPixmap.fromImage(ImageQt.ImageQt(face).copy())
+                    label.setPixmap(as_qimg)
+                    hbox.addWidget(label)
+            else:
+                hbox.addWidget(QLabel("No Matches"))
+            layout.addWidget(mainface_label)
+            layout.addItem(hbox)
         self.setLayout(layout)
 
         #db_get_face_matches(embedding_hash)
@@ -148,6 +173,7 @@ class WFFWindow(QWidget):
         self.current_view.hide()
         self.layout().replaceWidget(self.current_view,self.face_views[face_hash])
         self.current_view = self.face_views[face_hash]
+        self.setGeometry(500,500,500,500)
 
 
 class WFFImageGrid(QWidget):

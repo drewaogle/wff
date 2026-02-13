@@ -6,6 +6,8 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 import weaviate
 from PIL import Image
 from typing import List,Tuple
+from pprint import pprint
+from thrd_party.deepface_verification import find_threshold,find_confidence
 
 def mpl_grid( df_images):
     nf = len(df_images)
@@ -88,4 +90,65 @@ def db_get_faces(image_name:str):
             results ])),
         [(f["embedding_hash"],f["embedding"]) for f in results])
 
+
+def db_get_similar_by_ehash( ehash:str ):
+    emb_find = wc.query.get(df_class).with_additional(["id"])\
+            .with_where( {
+                    "path": ["embedding_hash"],
+                    "operator":"Equal",
+                    "valueText":ehash
+                    }
+                    ).do()
+    if "errors" in emb_find:
+        pprint(emb_find)
+        return []
+    emb_id = emb_find["data"]["Get"][df_class][0]["_additional"]["id"]
+    print("Using Object Similiarity")
+    similar = wc.query.get(df_class, properties=["embedding_hash","img_name","face","face_shape"])\
+            .with_additional(["id", "distance"])\
+            .with_near_object({"id":emb_id}).do()
+    if "errors" in similar:
+        pprint(similar)
+        return []
+    sresults = similar["data"]["Get"][df_class]
+    scnt = len(sresults)
+    print(f"Found {scnt}")
+    i = 0
+    df_model="VGG-Face"
+    df_vect_dist="cosine"
+    thresh = find_threshold(model_name=df_model, distance_metric=df_vect_dist)
+    filtered=[]
+    while i < 20:
+        addl = sresults[i]["_additional"]
+        passed_cutoff =  addl['distance'] <= thresh
+        conf = find_confidence(distance=addl['distance'], model_name=df_model,
+                distance_metric=df_vect_dist, verified=passed_cutoff)
+        print(f"{i} - {addl['id']} {addl['distance']} same? {passed_cutoff} {conf}%") 
+        filtered.append({ 
+            'face': sresults[i]["face"],
+            'shape': sresults[i]["face_shape"],
+            'verified':passed_cutoff,
+            'confidence':conf,
+            'src':sresults[i]["img_name"],
+            'ehash':sresults[i]["embedding_hash"]
+            })
+        i = i + 1
+        #pprint(sresults[i])
+
+    limited = list(filter(lambda x: x['confidence'] > 50.0, filtered))
+    limited.sort(key=lambda x: x['confidence'])
+
+    # takes raw np
+    def convert_to_pngs( pair ):
+        nparr, size  = pair
+        # we need uint8, not float32
+        return Image.fromarray( (nparr * 255).astype(np.uint8))
+    if len(limited) < 1:
+        print("No matches")
+        return []
+    # we want a set of faces with their source images
+    return list(zip(map( convert_to_pngs,
+        convert_deepface_images( [ (f["face"], f["shape"])   for f in
+            limited[0:6] ])),
+        [(f["ehash"], f["confidence"],f["src"]) for f in limited[0:6]]))
 
