@@ -38,7 +38,7 @@ class EmbeddingModel:
                 image_features = self.model.encode_image(image_data)
                 image_features /= image_features.norm(dim=-1,keepdim=True)
                 print("Features out: {}".format(type(image_features)))
-                all_features.append([image_features.cpu(), image.path_hash])
+                all_features.append([image_features.cpu(),image.path, image.path_hash])
         return all_features
 
 CLIP_EMBEDDING_NAME="Embedding_CLIP_ViT"
@@ -66,11 +66,18 @@ def run( imgroot , save=False, cnt = 1 ):
 
     feats = m.process_images(images)
     if save:
+        embs=[]
         for feat in feats:
             # put in tmp to verify save is working
-            print(f"Saving {feat[1]}")
-            with open( f"/tmp/{feat[1]}.emb",'wb') as f:
-                f.write(feat[0].numpy())
+            as_np = feat[0].numpy()
+            print(f"Saving {feat[1]} as {feat[2]}.emb dims is {as_np.shape}")
+            with open( f"/tmp/{feat[2]}.emb",'wb') as f:
+                f.write(as_np.flatten())
+            embs.append(wfdb.WFFEmbedding(
+                embedding = as_np.flatten().tolist(),
+                img_name=feat[1],
+                model_name=m.MODEL_NAME ))
+        wfdb.insert_embeddings( CLIP_EMBEDDING_NAME, embs )
 
     return feats
 
