@@ -45,4 +45,10 @@ We'll want a different db to allow clustering.
 this uses arcface to recognize then detect using retinaface.
 
 ## other
-https://www.kaggle.com/code/stpeteishii/face-matching-with-deepface-arcface-retinaface
+
+## clip
+```
+pip install open_clip_torch
+```
+directions:
+https://huggingface.co/docs/hub/en/open_clip

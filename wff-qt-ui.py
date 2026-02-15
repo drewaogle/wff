@@ -61,14 +61,16 @@ class WFFFaceMatchesWindow(QWidget):
             mface,mfi = faces[0]
             mainface_label = WFFMatchLabel(mfi[0],mfi[2], mfi[1])
             as_qimg = QPixmap.fromImage(ImageQt.ImageQt(mface).copy())
-            mainface_label.setPixmap(as_qimg)
+            spx=as_qimg.scaled(150,150,Qt.AspectRatioMode.KeepAspectRatio)
+            mainface_label.setPixmap(spx)
             hbox = QHBoxLayout()
             if len(faces) > 1:
                 for f in faces[1:]:
                     face,finfo = f 
                     label = WFFMatchLabel(finfo[0],finfo[2], finfo[1])
                     as_qimg = QPixmap.fromImage(ImageQt.ImageQt(face).copy())
-                    label.setPixmap(as_qimg)
+                    spx=as_qimg.scaled(100,100,Qt.AspectRatioMode.KeepAspectRatio)
+                    label.setPixmap(spx)
                     hbox.addWidget(label)
             else:
                 hbox.addWidget(QLabel("No Matches"))
@@ -76,7 +78,8 @@ class WFFFaceMatchesWindow(QWidget):
             layout.addItem(hbox)
         self.setLayout(layout)
 
-        #db_get_face_matches(embedding_hash)
+
+# view for showing a picture and the faces
 class WFFPictureMatchesWindow(QWidget):
     faceSelected  = pyqtSignal(str)
     def __init__(self, image:str): 
@@ -96,7 +99,8 @@ class WFFPictureMatchesWindow(QWidget):
             face,info = face_data
             face_label = WFFFaceLabel(fn, info[0])
             as_qimg = QPixmap.fromImage(ImageQt.ImageQt(face).copy())
-            face_label.setPixmap(as_qimg)
+            spx=as_qimg.scaled(100,100,Qt.AspectRatioMode.KeepAspectRatio)
+            face_label.setPixmap(spx)
             face_label.faceImageClicked.connect(self.facePicked )
             vbox.addWidget(face_label)
 
@@ -143,6 +147,7 @@ class WFFWindow(QWidget):
         QWidget.__init__(self)
         self.setWindowTitle("Wassmann Family Finder")
         self.setGeometry(500,500,500,500)
+        self.setMaximumSize(500,500) 
         self.picture_grid = WFFPictureGridWindow(images)
         self.picture_grid.imageSelected.connect(self.viewImage)
         layout = QVBoxLayout()
@@ -173,7 +178,6 @@ class WFFWindow(QWidget):
         self.current_view.hide()
         self.layout().replaceWidget(self.current_view,self.face_views[face_hash])
         self.current_view = self.face_views[face_hash]
-        self.setGeometry(500,500,500,500)
 
 
 class WFFImageGrid(QWidget):
