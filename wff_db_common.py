@@ -96,3 +96,36 @@ def insert_embeddings( class_name, embeddings:List[WFFEmbedding],client=None):
 
             batcher.add_data_object(properties, class_name, vector=e.embedding, uuid=uid)
     return True
+
+@dataclass
+class WFFSimilarEmbedding:
+    img_name:str
+    embedding:List[float]
+    embedding_hash:str
+    uid:str
+    distance:float
+
+def find_similar_embedding( class_name,
+        embedding:List[float], limit=5, client=None)->List[WFFSimilarEmbedding]:
+    if client is None:
+        client = get_client()
+    query = client.query.get(class_name, ["img_name", "embedding", "embedding_hash"])
+    query = (
+        query.with_near_vector({"vector": embedding})
+        .with_limit(limit)
+        .with_additional(["id", "distance"])
+    )
+    results = query.do()
+
+    data = results.get("data", {}).get("Get", {}).get(class_name, [])
+
+    return [
+            WFFSimilarEmbedding(
+                img_name = d["img_name"],
+                embedding = d["embedding"],
+                embedding_hash = d["embedding_hash"],
+                uid = d["_additional"]["id"],
+                distance = d["_additional"]["distance"]
+                )
+             for d in data ]
+
