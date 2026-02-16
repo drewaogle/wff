@@ -9,8 +9,8 @@ from typing import List,Tuple
 from pprint import pprint
 from thrd_party.deepface_verification import find_threshold,find_confidence
 
-def mpl_grid( df_images):
-    nf = len(df_images)
+def mpl_grid( images, title = None, img_type='auto'):
+    nf = len(images)
     if nf == 1:
         nr,nc = [1,1]
     else:
@@ -21,20 +21,20 @@ def mpl_grid( df_images):
             nc=nf/nr
     nc=math.ceil(nc)
     print(f"Grid is {nr} rows, {nc} columns")
-    fig = plt.figure(figsize=(nr*1.,nc*1.))
-    grid = ImageGrid(fig,111, nrows_ncols=(nr,nc), axes_pad=0.1)
-    for ax,im in zip(grid,df_images):
-        # data from deepface is:
-        # base64 encoded
-        ibin = base64.b64decode(im[0])
-        # float32
-        nar = np.frombuffer(ibin,dtype='f4')
-        # and BGR
-        nar = nar.reshape( im[1] )
-        nar = nar[:,:,::-1]
-        # convert it to RGB as matplotlib expects.
+    def mpl_convert( imgs ):
+        if img_type == 'auto':
+            if isinstance(imgs[0],str):
+                # we don't need image shape
+                return map( lambda pair: pair[0], convert_deepface_images(imgs))
+            else:
+                return imgs
 
-        ax.imshow( nar )
+    fig = plt.figure(figsize=(nr*1.,nc*1.))
+    if title:
+        plt.title(title)
+    grid = ImageGrid(fig,111, nrows_ncols=(nr,nc), axes_pad=0.1)
+    for ax,im in zip(grid,mpl_convert(images)):
+        ax.imshow( im )
     plt.show()
 
 def convert_deepface_images( df_images: List[str] ) -> List[Tuple[np.array,List[int]]]:

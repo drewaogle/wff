@@ -6,6 +6,8 @@ from pathlib import Path
 
 import wff_clip
 import wff_db_common as wfdb
+from wff_common import mpl_grid
+from PIL import Image
 
 def get_args():
     parser = ArgumentParser()
@@ -26,5 +28,9 @@ if __name__ == "__main__":
     emb = m.process_strings([args.search])
     print("wff_clip: Searching")
     sims = wfdb.find_similar_embedding(wff_clip.CLIP_EMBEDDING_NAME,emb)
+    sim_imgs=[]
     for s in sims:
         print(f" * {s.img_name} = {s.distance}")
+        sim_imgs.append(Image.open( base / s.img_name ))
+    mpl_grid(sim_imgs,title=f"Search: {args.search}")
+
